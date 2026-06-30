@@ -1,0 +1,111 @@
+openapi: 3.1.0
+info:
+  title: Récepteur de fiches pédagogiques
+  version: 1.0.0
+servers:
+  - url: https://travaill.vercel.app
+paths:
+  /api/fiches/import:
+    post:
+      operationId: importerFichePedagogique
+      summary: Envoyer une fiche pédagogique validée vers la plateforme.
+      security:
+        - ImportSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - utilisateur_email
+                - texte_integral
+              properties:
+                utilisateur_email:
+                  type: string
+                  description: Adresse courriel exacte du compte enseignant destinataire dans l'application.
+                texte_integral:
+                  type: string
+                  description: Texte complet de la fiche validée, copié fidèlement depuis la réponse finale du GPT.
+                fiche_de:
+                  type: string
+                dossier_ou_unite:
+                  type: string
+                san:
+                  type: string
+                sequence:
+                  type: string
+                date:
+                  type: string
+                cours:
+                  type: string
+                classe:
+                  type: string
+                fiche_no:
+                  type: string
+                duree:
+                  type: string
+                contenu_de_formation:
+                  type: string
+                competences_disciplinaires:
+                  type: string
+                competences_transversales:
+                  type: string
+                competences_transdisciplinaires:
+                  type: string
+                connaissances_et_techniques:
+                  type: string
+                strategie_objet_apprentissage:
+                  type: string
+                strategies_enseignement_apprentissage_evaluation:
+                  type: string
+                materiel:
+                  type: string
+                deroulement:
+                  type: array
+                  description: Lignes textuelles du déroulement. Chaque ligne doit conserver les titres, sous-titres, consignes et résultats attendus de la fiche.
+                  items:
+                    type: object
+                    properties:
+                      consignes:
+                        type: string
+                        description: Texte exact de la colonne Consignes pour cette ligne.
+                      resultats_attendus:
+                        type: string
+                        description: Texte exact de la colonne Résultats attendus pour cette ligne.
+                    additionalProperties: true
+                consignes:
+                  type: string
+                resultats_attendus:
+                  type: string
+                je_retiens:
+                  type: string
+                variante_pedagogique_possible:
+                  type: string
+              additionalProperties: true
+      responses:
+        "200":
+          description: Fiche reçue et enregistrée.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  succes:
+                    type: boolean
+                  message:
+                    type: string
+                  fiche_id:
+                    type: string
+                  mise_en_forme:
+                    type: string
+                    description: gemini si la mise en forme Gemini a réussi, local sinon.
+                  avertissement:
+                    type: string
+components:
+  schemas: {}
+  securitySchemes:
+    ImportSecret:
+      type: apiKey
+      in: header
+      name: x-import-secret
