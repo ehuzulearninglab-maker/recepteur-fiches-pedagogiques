@@ -878,10 +878,26 @@ export async function getGeminiAdminStatus(): Promise<{
 
 type StorageHealth = {
   database_configuree: boolean;
+  database_hote?: string;
+  database_port?: string;
   stockage: "postgres" | "temporaire";
   stockage_persistant: boolean;
   probleme?: string;
 };
+
+function databaseConnectionInfo(): { hote?: string; port?: string } {
+  const connectionString = databaseConnectionString();
+  if (!connectionString) {
+    return {};
+  }
+
+  try {
+    const url = new URL(connectionString);
+    return { hote: url.hostname, port: url.port };
+  } catch {
+    return {};
+  }
+}
 
 function explainPostgresProblem(error?: string): string | undefined {
   if (!error) {
@@ -907,6 +923,7 @@ function explainPostgresProblem(error?: string): string | undefined {
 
 export async function getStorageHealth(): Promise<StorageHealth> {
   const database_configuree = Boolean(databaseConnectionString());
+  const databaseInfo = databaseConnectionInfo();
   const status = await getGeminiAdminStatus();
   const probleme = !database_configuree
     ? "La variable DATABASE_URL est absente dans Vercel."
@@ -916,6 +933,8 @@ export async function getStorageHealth(): Promise<StorageHealth> {
 
   return {
     database_configuree,
+    database_hote: databaseInfo.hote,
+    database_port: databaseInfo.port,
     stockage: status.stockage,
     stockage_persistant: status.stockage_persistant,
     probleme
