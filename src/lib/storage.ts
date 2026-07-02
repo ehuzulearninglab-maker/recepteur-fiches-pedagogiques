@@ -876,6 +876,51 @@ export async function getGeminiAdminStatus(): Promise<{
   };
 }
 
+type StorageHealth = {
+  database_configuree: boolean;
+  stockage: "postgres" | "temporaire";
+  stockage_persistant: boolean;
+  probleme?: string;
+};
+
+function explainPostgresProblem(error?: string): string | undefined {
+  if (!error) {
+    return undefined;
+  }
+
+  const value = error.toLowerCase();
+  if (value.includes("password authentication failed") || value.includes("invalid password")) {
+    return "Le mot de passe de la base Supabase semble incorrect.";
+  }
+  if (value.includes("network is unreachable") || value.includes("enetunreach") || value.includes("etimedout")) {
+    return "La connexion directe Supabase ne passe pas depuis Vercel. Utilisez l'URL Transaction pooler Supabase.";
+  }
+  if (value.includes("enotfound") || value.includes("getaddrinfo")) {
+    return "L'adresse de connexion Supabase est introuvable. Verifiez l'URL DATABASE_URL.";
+  }
+  if (value.includes("too many clients") || value.includes("remaining connection slots")) {
+    return "Trop de connexions directes. Utilisez l'URL Transaction pooler Supabase.";
+  }
+
+  return "Connexion PostgreSQL/Supabase impossible avec la configuration actuelle.";
+}
+
+export async function getStorageHealth(): Promise<StorageHealth> {
+  const database_configuree = Boolean(databaseConnectionString());
+  const status = await getGeminiAdminStatus();
+  const probleme = !database_configuree
+    ? "La variable DATABASE_URL est absente dans Vercel."
+    : !status.stockage_persistant
+      ? explainPostgresProblem(globalForPg.fichesPostgresError)
+      : undefined;
+
+  return {
+    database_configuree,
+    stockage: status.stockage,
+    stockage_persistant: status.stockage_persistant,
+    probleme
+  };
+}
 export async function recordImportActivity(input: {
   utilisateur_id: string;
   fiche_id?: string;
