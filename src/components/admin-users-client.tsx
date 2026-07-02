@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ShieldCheck, UserCheck, UserMinus, UserRound } from "lucide-react";
+import { KeyRound, ShieldCheck, UserCheck, UserMinus, UserRound } from "lucide-react";
 import type { UserRole } from "@/lib/types";
 
 type AdminUser = {
@@ -49,6 +49,36 @@ export function AdminUsersClient({ utilisateurs, currentUserId }: { utilisateurs
     setItems((current) => current.map((user) => (user.id === id ? data.utilisateur : user)));
   }
 
+  async function resetPassword(user: AdminUser) {
+    const password = window.prompt(
+      `Nouveau mot de passe temporaire pour ${user.email}\n\nIl doit contenir au moins 8 caractères.`
+    );
+    if (password === null) {
+      return;
+    }
+
+    const trimmed = password.trim();
+    if (trimmed.length < 8) {
+      window.alert("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+
+    setSavingId(user.id);
+    const response = await fetch(`/api/admin/utilisateurs/${user.id}/mot-de-passe`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mot_de_passe: trimmed })
+    });
+    setSavingId(null);
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
+      window.alert(data.message || "Impossible de modifier le mot de passe.");
+      return;
+    }
+
+    window.alert(`Mot de passe mis à jour.\n\nCommuniquez ce mot de passe à l'utilisateur :\n${trimmed}`);
+  }
   return (
     <div className="space-y-5">
       <section className="grid gap-3 md:grid-cols-3">
@@ -131,6 +161,15 @@ export function AdminUsersClient({ utilisateurs, currentUserId }: { utilisateurs
                       >
                         <ShieldCheck size={15} aria-hidden="true" />
                         Admin
+                      </button>
+                      <button
+                        type="button"
+                        className="bouton-secondaire px-3 py-1.5"
+                        disabled={savingId === user.id}
+                        onClick={() => resetPassword(user)}
+                      >
+                        <KeyRound size={15} aria-hidden="true" />
+                        Mot de passe
                       </button>
                     </div>
                   </td>

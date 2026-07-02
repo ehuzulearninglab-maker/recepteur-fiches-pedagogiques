@@ -753,6 +753,27 @@ export async function updateUserRole(id: string, role: UserRole): Promise<UserRe
   return db.utilisateurs[index];
 }
 
+
+export async function updateUserPassword(id: string, motDePasseHash: string): Promise<UserRecord | undefined> {
+  if (usePostgres() && (await ensurePostgresSeed())) {
+    const pool = await getPool();
+    const result = await pool.query("update utilisateurs set mot_de_passe = $1 where id = $2 returning *", [
+      motDePasseHash,
+      id
+    ]);
+    return result.rows[0] ? toUser(result.rows[0]) : undefined;
+  }
+
+  const db = await readDatabase();
+  const index = db.utilisateurs.findIndex((user) => user.id === id);
+  if (index === -1) {
+    return undefined;
+  }
+
+  db.utilisateurs[index] = { ...db.utilisateurs[index], mot_de_passe: motDePasseHash };
+  await writeDatabase(db);
+  return db.utilisateurs[index];
+}
 export async function getGeminiSettings(): Promise<AppSettingsRecord> {
   if (usePostgres() && (await ensurePostgresSeed())) {
     const pool = await getPool();

@@ -46,7 +46,7 @@ export function PasswordRecoveryForm() {
 
       {done ? (
         <p className="mb-4 rounded-md bg-ciel px-3 py-2 text-sm font-medium text-sauge">
-          Si un compte correspond à ce courriel, une procédure de réinitialisation pourra être envoyée.
+          Si un compte correspond à ce courriel, contactez l'administrateur. Il peut définir un nouveau mot de passe temporaire depuis son espace admin.
         </p>
       ) : null}
 
