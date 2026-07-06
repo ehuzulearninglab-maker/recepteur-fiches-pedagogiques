@@ -156,7 +156,8 @@ const EXTRA_FIELD_LABELS: Record<string, string> = {
   competences_transdisciplinaires: "Compétences transdisciplinaires",
   je_retiens: "Je retiens",
   variante_pedagogique_possible: "Variante pédagogique possible",
-  sections_supplementaires: "Sections supplémentaires"
+  sections_supplementaires: "Sections supplementaires",
+  notes_personnelles: "Notes personnelles"
 };
 
 export const HEADER_FIELDS: FieldDefinition[] = [
@@ -347,8 +348,8 @@ function rowFromRecord(row: Record<string, JsonValue>): DeroulementRow {
     duree: readRowValue(row, ROW_ALIASES.duree),
     activites_enseignant: readRowValue(row, ROW_ALIASES.activites_enseignant),
     activites_apprenants: readRowValue(row, ROW_ALIASES.activites_apprenants),
-    consignes: readRowValue(row, ROW_ALIASES.consignes),
-    resultats_attendus: [resultats, extras].filter(Boolean).join("\n"),
+    consignes: [readRowValue(row, ROW_ALIASES.consignes), extras].filter(Boolean).join("\n"),
+    resultats_attendus: resultats,
     evaluation: readRowValue(row, ROW_ALIASES.evaluation)
   };
 }

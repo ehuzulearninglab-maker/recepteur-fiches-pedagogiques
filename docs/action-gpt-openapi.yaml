@@ -3,7 +3,7 @@ info:
   title: Récepteur de fiches pédagogiques
   version: 1.0.0
 servers:
-  - url: https://travaill.vercel.app
+  - url: https://recepteur-fiches-pedagogiques.vercel.app
 paths:
   /api/fiches/import:
     post:

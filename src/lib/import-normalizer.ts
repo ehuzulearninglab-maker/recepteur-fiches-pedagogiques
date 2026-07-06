@@ -21,8 +21,10 @@ const SECTION_STARTS = [
   "c-",
   "ii -",
   "ii-",
+  "deroulement",
   "je retiens",
   "variante",
+  "notes personnelles",
   "pre requis",
   "prerequis",
   "realisation",
@@ -32,13 +34,18 @@ const SECTION_STARTS = [
   "evaluation"
 ];
 
+const DEROULEMENT_STOP_STARTS = ["je retiens", "variante", "notes personnelles", "notes", "annexe"];
+
 function canonical(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/°/g, "o")
-    .replace(/[’']/g, "")
+    .replace(/\u0153/g, "oe")
+    .replace(/\u0152/g, "oe")
+    .replace(/\u00b0/g, "o")
+    .replace(/[\u2019']/g, "")
     .toLowerCase()
+    .replace(/[^a-z0-9:./ -]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -78,8 +85,8 @@ function setIfMissing(target: FicheContenu, key: string, value: string) {
 }
 
 function valueAfterColon(line: string): string {
-  const colonIndex = line.indexOf(":");
-  return colonIndex >= 0 ? line.slice(colonIndex + 1).trim() : "";
+  const match = line.match(/^[^:\uFF1A]+[:\uFF1A]\s*(.+)$/);
+  return match?.[1]?.trim() ?? "";
 }
 
 function findLineValue(lines: string[], pattern: RegExp, useWholeLine = false): string {
@@ -127,7 +134,7 @@ function extractBlock(lines: string[], label: string): string {
   return values.join("\n").trim();
 }
 
-function extractBetween(lines: string[], startLabel: string, endLabel?: string): string {
+function extractBetween(lines: string[], startLabel: string, endLabels: string[] = []): string {
   const start = lines.findIndex((line) => canonical(line).startsWith(startLabel));
   if (start === -1) {
     return "";
@@ -141,7 +148,8 @@ function extractBetween(lines: string[], startLabel: string, endLabel?: string):
 
   for (let index = start + 1; index < lines.length; index += 1) {
     const line = lines[index];
-    if (endLabel && canonical(line).startsWith(endLabel)) {
+    const clean = canonical(line);
+    if (endLabels.some((label) => clean.startsWith(label))) {
       break;
     }
     values.push(line);
@@ -150,11 +158,112 @@ function extractBetween(lines: string[], startLabel: string, endLabel?: string):
   return values.join("\n").trim();
 }
 
+function isDeroulementStart(line: string): boolean {
+  const value = canonical(line).replace(/[:.]+$/g, "");
+  return value === "deroulement" || /^ii\s*-?\s*deroulement/.test(value);
+}
+
+function isDeroulementStop(line: string): boolean {
+  const value = canonical(line);
+  return DEROULEMENT_STOP_STARTS.some((label) => value.startsWith(label));
+}
+
+function isDeroulementHeader(line: string): boolean {
+  const value = canonical(line);
+  return /^consignes?\s+resultats?/.test(value) || /^-+\s*-+$/.test(value);
+}
+
+function splitMarkdownRow(line: string): { consignes: string; resultats_attendus: string } | undefined {
+  if (!line.includes("|")) {
+    return undefined;
+  }
+
+  const cells = line
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (cells.length < 2 || cells.every((cell) => /^-+$/.test(cell))) {
+    return undefined;
+  }
+
+  const header = cells.map(canonical).join(" ");
+  if (/consignes?\s+resultats?/.test(header)) {
+    return undefined;
+  }
+
+  return {
+    consignes: cells[0],
+    resultats_attendus: cells.slice(1).join("\n")
+  };
+}
+
+function splitDelimitedRow(line: string): { consignes: string; resultats_attendus: string } | undefined {
+  const tabParts = line.split(/\t+/).map((part) => part.trim()).filter(Boolean);
+  const spacedParts = tabParts.length > 1 ? tabParts : line.split(/\s{3,}/).map((part) => part.trim()).filter(Boolean);
+
+  if (spacedParts.length < 2) {
+    return undefined;
+  }
+
+  return {
+    consignes: spacedParts[0],
+    resultats_attendus: spacedParts.slice(1).join("\n")
+  };
+}
+
+function splitCompactExpectedResult(line: string): { consignes: string; resultats_attendus: string } | undefined {
+  const normalized = canonical(line);
+  const markers = [
+    " a ",
+    " ont ",
+    " les apprenants ",
+    " les eleves ",
+    " lapprenant ",
+    " propose ",
+    " proposent ",
+    " identifie ",
+    " identifient ",
+    " cite ",
+    " citent ",
+    " donne ",
+    " donnent ",
+    " repond ",
+    " repondent ",
+    " explique ",
+    " expliquent ",
+    " realise ",
+    " realisent "
+  ];
+  const marker = markers
+    .map((item) => ({ item, index: ` ${normalized} `.indexOf(item) }))
+    .filter((item) => item.index > 0)
+    .sort((a, b) => a.index - b.index)[0];
+
+  if (!marker) {
+    return undefined;
+  }
+
+  const rawIndex = Math.max(1, marker.index - 1);
+  return {
+    consignes: line.slice(0, rawIndex).trim(),
+    resultats_attendus: line.slice(rawIndex).trim()
+  };
+}
+
+function splitDeroulementRow(line: string): { consignes: string; resultats_attendus: string } {
+  return (
+    splitMarkdownRow(line) ||
+    splitDelimitedRow(line) ||
+    splitCompactExpectedResult(line) || {
+      consignes: line,
+      resultats_attendus: ""
+    }
+  );
+}
+
 function parseDeroulement(lines: string[]): Array<{ consignes: string; resultats_attendus: string }> {
-  const start = lines.findIndex((line) => {
-    const value = canonical(line);
-    return value === "deroulement" || /^ii\s*-?\s*deroulement/.test(value);
-  });
+  const start = lines.findIndex(isDeroulementStart);
   if (start === -1) {
     return [];
   }
@@ -162,31 +271,24 @@ function parseDeroulement(lines: string[]): Array<{ consignes: string; resultats
   const rows: Array<{ consignes: string; resultats_attendus: string }> = [];
   for (let index = start + 1; index < lines.length; index += 1) {
     const line = lines[index];
-    const plain = canonical(line);
-    if (plain.startsWith("je retiens") || plain.startsWith("variante")) {
+    if (isDeroulementStop(line)) {
       break;
     }
-    if (/^consignes?\s+resultats?/.test(plain)) {
+    if (isDeroulementHeader(line)) {
       continue;
     }
 
-    const tabParts = line.split(/\t+/).map((part) => part.trim()).filter(Boolean);
-    const spacedParts = tabParts.length > 1 ? tabParts : line.split(/\s{3,}/).map((part) => part.trim()).filter(Boolean);
-
-    if (spacedParts.length > 1) {
-      rows.push({
-        consignes: spacedParts[0],
-        resultats_attendus: spacedParts.slice(1).join(" ")
-      });
-    } else {
-      rows.push({
-        consignes: line,
-        resultats_attendus: ""
-      });
+    const row = splitDeroulementRow(line);
+    if (row.consignes || row.resultats_attendus) {
+      rows.push(row);
     }
   }
 
-  return rows.filter((row) => row.consignes || row.resultats_attendus);
+  return rows;
+}
+
+function joinRows(rows: Array<{ consignes: string; resultats_attendus: string }>, key: "consignes" | "resultats_attendus"): string {
+  return rows.map((row) => row[key]).filter(Boolean).join("\n");
 }
 
 export function normalizeImportedFiche(content: FicheContenu): FicheContenu {
@@ -196,7 +298,7 @@ export function normalizeImportedFiche(content: FicheContenu): FicheContenu {
   }
 
   const lines = linesOf(rawText);
-  const next: FicheContenu = { ...content };
+  const next: FicheContenu = { ...content, texte_integral: textValue(content.texte_integral) || rawText };
 
   setIfMissing(next, "fiche_de", firstLine(lines));
   setIfMissing(next, "cours", findLineValue(lines, /^cours\s*:\s*(.+)$/));
@@ -223,8 +325,11 @@ export function normalizeImportedFiche(content: FicheContenu): FicheContenu {
     next.deroulement = deroulement as unknown as JsonValue;
   }
 
-  setIfMissing(next, "je_retiens", extractBetween(lines, "je retiens", "variante"));
-  setIfMissing(next, "variante_pedagogique_possible", extractBetween(lines, "variante pedagogique possible"));
+  setIfMissing(next, "consignes", joinRows(deroulement, "consignes"));
+  setIfMissing(next, "resultats_attendus", joinRows(deroulement, "resultats_attendus"));
+  setIfMissing(next, "je_retiens", extractBetween(lines, "je retiens", ["variante", "notes personnelles", "notes"]));
+  setIfMissing(next, "variante_pedagogique_possible", extractBetween(lines, "variante pedagogique possible", ["notes personnelles", "notes"]));
+  setIfMissing(next, "notes_personnelles", extractBetween(lines, "notes personnelles"));
 
   return next;
 }
