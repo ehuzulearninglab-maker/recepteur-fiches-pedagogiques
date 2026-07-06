@@ -237,41 +237,14 @@ async function callGemini(content: FicheContenu, apiKey: string, model: string):
 
 export async function formatImportedFiche(content: FicheContenu): Promise<FormattedImport> {
   const local = normalizeImportedFiche(content);
-  const config = await getGeminiRuntimeConfig();
-  const model = config.model || DEFAULT_GEMINI_MODEL;
-  const apiKey = config.apiKey;
 
-  if (!apiKey) {
-    return {
-      contenu: local,
-      source: "local",
-      modele: model,
-      tokens_entree: 0,
-      tokens_sortie: 0,
-      tokens_total: 0,
-      avertissement: "GEMINI_API_KEY absente : mise en forme locale utilisee."
-    };
-  }
-
-  try {
-    const gemini = await callGemini(local, apiKey, model);
-    return {
-      contenu: normalizeImportedFiche(mergeContent(local, gemini.contenu)),
-      source: "gemini",
-      modele: model,
-      tokens_entree: gemini.tokens_entree,
-      tokens_sortie: gemini.tokens_sortie,
-      tokens_total: gemini.tokens_total
-    };
-  } catch (error) {
-    return {
-      contenu: local,
-      source: "local",
-      modele: model,
-      tokens_entree: 0,
-      tokens_sortie: 0,
-      tokens_total: 0,
-      avertissement: error instanceof Error ? error.message : "Mise en forme Gemini indisponible."
-    };
-  }
+  return {
+    contenu: local,
+    source: "local",
+    modele: "mise-en-forme-locale",
+    tokens_entree: 0,
+    tokens_sortie: 0,
+    tokens_total: 0,
+    avertissement: "Mise en forme locale utilisee pour conserver la fiche sans resume IA."
+  };
 }
